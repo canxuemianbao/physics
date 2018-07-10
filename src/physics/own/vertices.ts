@@ -1,4 +1,5 @@
-import { Point, Vector } from './utils';
+import { Point } from './utils';
+import * as _ from 'lodash';
 
 const empty = [new Point(0, 0), new Point(0, 0)];
 export class Vertices {
@@ -8,7 +9,7 @@ export class Vertices {
   constructor(
     public dots:Point[] = empty,
   ) {
-    this.dots = this.dots.length <=2 ? empty : this.dots;
+    this.dots = this.dots.length <=2 ? empty : _.cloneDeep(this.dots);
     this.init();
   }
 

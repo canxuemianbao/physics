@@ -68,7 +68,7 @@ export class Projection{
     }
     const max_min = Math.max(this.min, projection.min);
     const min_max = Math.min(this.max, projection.max);
-    return Math.abs(min_max - max_min);
+    return min_max - max_min;
   }
 }     
 

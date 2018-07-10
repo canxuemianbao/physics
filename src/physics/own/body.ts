@@ -30,7 +30,6 @@ export class Body {
   public density = 1;
   public angle = 0;
   public restitution = 0;
-  public pos = new Point(0, 0);
   public vertices = new Vertices([]);
   constructor(dots:Point[], options:Config) {
     this.vertices = new Vertices(dots);
@@ -39,9 +38,12 @@ export class Body {
     this.density = options.density || this.density;
     this.restitution = options.restitution || this.restitution;
     this.mass = options.mass || this.density * this.vertices.area;
-    this.pos = options.pos || this.pos;
     this.angle = options.angle || 0;
-    this.change_pos(this.pos);    
+    this.change_pos(options.pos || this.pos);    
+    this.rotate(this.angle);
+  }
+  public get pos() {
+    return this.vertices.centroid || new Point(0, 0);
   }
   momentum() {
     return this.velocity.product(this.mass);
@@ -55,8 +57,10 @@ export class Body {
   change_pos(new_pos:Point) {
     const distance_x = new_pos.x - this.pos.x;
     const distance_y = new_pos.y - this.pos.y;
-    this.pos = new_pos;
     this.vertices.move(distance_x, distance_y);
+  }
+  rotate(angle:number) {
+    this.vertices.rotate(angle, this.vertices.centroid);
   }
   update(tick:number) {
     const pos_x = this.velocity.x * tick + this.pos.x;
@@ -66,14 +70,19 @@ export class Body {
     this.velocity.y = this.acceleration.y * tick + this.velocity.y;
   }
 
-  // TODO: reture manifold
   collide_with(body:Body) {
     const axes1 = this.get_axes();
     const axes2 = body.get_axes();
 
     const result1 = this.collide_with_axes(body, axes1);
     const result2 = this.collide_with_axes(body, axes2);
-    return result1.magnitude() > result2.magnitude() ? new Manifold([body, this], result2) : new Manifold([this, body], result1);
+    const result = result1.magnitude() > result2.magnitude() ? new Manifold([body, this], result2) : new Manifold([this, body], result1);
+    // if direction is contrast
+    if (result.overlap.dot_product(result.pair[0].pos.minus(result.pair[1].pos)) < 0) {
+      result.overlap.x = -result.overlap.x;
+      result.overlap.y = -result.overlap.y;
+    }
+    return result;
   }
 
   collide_with_axes(body:Body, axes:Vector[]) {
@@ -114,9 +123,9 @@ export class Body {
     const dots = this.vertices.dots;
     const normals = [];
     for (let i = 1; i< dots.length; i++) {
-      normals.push(dots[i].minus(dots[i - 1]).normal());
+      normals.push(dots[i - 1].minus(dots[i]).normal());
     }
-    normals.push(dots[0].minus(dots[dots.length - 1]).normal());
+    normals.push(dots[dots.length - 1].minus(dots[0]).normal());
     return normals;
   }
 }

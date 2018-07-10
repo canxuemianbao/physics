@@ -24,13 +24,14 @@ export class World {
     const position_correction = (manifold:Manifold) => {
       const {pair, overlap} = manifold;
       const body1 = pair[0];
-      const body2 = pair[1];const slop = 0.01;
+      const body2 = pair[1];
+      const slop = 0.01;
       const percent = 0.2;
       const correction_length = (overlap.magnitude() - slop) / (body1.inv_mass() + body2.inv_mass()) * percent;
-      const correction = overlap.product(correction_length);
+      const correction = overlap.normalize().product(correction_length);
       
-      const new_pos1 = body1.pos.minus(correction.product(body1.inv_mass()));
-      const new_pos2 = body2.pos.add(correction.product(body1.inv_mass()));
+      const new_pos1 = body1.pos.add(correction.product(body1.inv_mass()));
+      const new_pos2 = body2.pos.minus(correction.product(body2.inv_mass()));
       body1.change_pos(new_pos1);
       body2.change_pos(new_pos2);
     }
@@ -50,8 +51,8 @@ export class World {
       let j = -(1 + restitution) * vel_along_normal;
       j /= body1.inv_mass() + body2.inv_mass();
       const impulse = normal.product(j);
-      body1.velocity = body1.velocity.minus(impulse.product(body1.inv_mass()));
-      body2.velocity = body2.velocity.add(impulse.product( body2.inv_mass()));
+      body1.velocity = body1.velocity.add(impulse.product(body1.inv_mass()));
+      body2.velocity = body2.velocity.minus(impulse.product( body2.inv_mass()));
       position_correction(manifold);
     }
   };

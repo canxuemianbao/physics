@@ -21,9 +21,9 @@ export function create(world:World, options:any) {
 function draw_body(body:Body) {
   ctx.save();
   // prepare
-  ctx.translate(body.pos.x, body.pos.y);
-  ctx.rotate(body.angle);
-  ctx.translate(-body.pos.x, -body.pos.y);
+  // ctx.translate(body.pos.x, body.pos.y);
+  // ctx.rotate(body.angle);
+  // ctx.translate(-body.pos.x, -body.pos.y);
   ctx.strokeStyle = '#FFFFFF';  
   // draw
   const dots = body.vertices.dots;
