@@ -18,6 +18,10 @@ export class Vector {
     return this.x * vec.x + this.y * vec.y;
   }
 
+  cross(vec:Vector) {
+    return (this.x * vec.y) - (this.y * vec.x);
+  }
+
   product(factor:number) {
     return new Vector(this.x * factor, this.y * factor);
   }
@@ -55,6 +59,8 @@ export class Projection{
     public min:number,
     public max:number,
     public vec:Vector,
+    private min_dot:Point,
+    private max_dot:Point,
   ) {
   }
 
@@ -70,6 +76,14 @@ export class Projection{
     const min_max = Math.min(this.max, projection.max);
     return min_max - max_min;
   }
+  
+  // get contact_point(projection:Projection) {
+  //   if (!this.overlaps(projection)) {
+  //     return 0;
+  //   }
+  //   const max_min = Math.max(this.min, projection.min);
+  //   const min_max = Math.min(this.max, projection.max);
+  // }
 }     
 
 export class Point {

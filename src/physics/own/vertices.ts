@@ -1,13 +1,15 @@
 import { Point } from './utils';
 import * as _ from 'lodash';
 
-const empty = [new Point(0, 0), new Point(0, 0)];
+export const empty = [new Point(0, 0), new Point(0, 0)];
 export class Vertices {
   public area:number;
   public centroid:Point;
+  public inertia:number;
 
   constructor(
     public dots:Point[] = empty,
+    public density:number = 1,
   ) {
     this.dots = this.dots.length <=2 ? empty : _.cloneDeep(this.dots);
     this.init();
@@ -54,7 +56,18 @@ export class Vertices {
     return new Point((a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3);
   }
 
+  // http://lab.polygonal.de/2006/08/17/calculating-the-moment-of-inertia-of-a-convex-polygon/
+  triangle_inertia(a_point:Point, b_point:Point, c_point:Point) {
+    const A_B = a_point.minus(b_point);
+    const A_C = a_point.minus(c_point);
+    const a = A_C.dot_product(A_B.normalize());
+    const h = A_C.cross(A_B.normalize());
+    const b = A_B.magnitude();
+    return (b * b * b * h - b * b * h * a + b * h * a * a + b * h * h * h) / 36;
+  }
+
   init() {
+    // calculate area and centroid
     let area = 0;
     let centroid = new Point(0, 0);
     const point_a = this.dots[0];
@@ -70,5 +83,19 @@ export class Vertices {
     }
     this.area = Math.abs(area);
     this.centroid = centroid;
+
+    // calculate inertia for rotation
+    let inertia = 0;
+    for (let i = 0; i < this.dots.length - 1; i++) {
+      const point_a = this.dots[i];
+      const point_b = this.dots[i + 1];
+      const triangle_centroid = this.triangle_centroid(point_a, point_b, centroid);
+      inertia +=
+        this.triangle_inertia(point_a, point_b, centroid) +
+        this.triangle_area(point_a, point_b, centroid) *
+        this.density *
+        centroid.minus(triangle_centroid).magnitude();
+    }
+    this.inertia = Math.abs(inertia);
   }
 }

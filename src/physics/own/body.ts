@@ -1,5 +1,5 @@
 import { Vector, Point, origin_point, Projection} from './utils';
-import { Vertices } from './vertices';
+import { Vertices, empty } from './vertices';
 
 export interface Config {
   acceleration?:Vector;
@@ -7,15 +7,18 @@ export interface Config {
   mass?:number;
   density?:number;
   angle?:number;
+  angular_speed?:number;
   restitution?:number;
   pos?:Point;
+  name?:string;
 }
 
 export class Manifold {
-  // body[0] respresents the main Body
+  // pair[0] respresents the main Body
   constructor(
     public pair:[Body, Body],
     public overlap:Vector,
+    public contact_point:Point,
   ) {}
 
   is_separated() {
@@ -29,21 +32,28 @@ export class Body {
   public mass = 0;
   public density = 1;
   public angle = 0;
+  public angular_speed = 0;
   public restitution = 0;
   public vertices = new Vertices([]);
+  public name = '';
   constructor(dots:Point[], options:Config) {
-    this.vertices = new Vertices(dots);
-    this.acceleration = options.acceleration || this.acceleration;
-    this.velocity = options.velocity || this.velocity;
     this.density = options.density || this.density;
+    this.vertices = new Vertices(dots, this.density);
+    this.acceleration = options.acceleration || this.acceleration;
+    this.angular_speed = options.angular_speed || this.angular_speed;
+    this.velocity = options.velocity || this.velocity;
     this.restitution = options.restitution || this.restitution;
     this.mass = options.mass || this.density * this.vertices.area;
     this.angle = options.angle || 0;
+    this.name = options.name || this.name;
     this.change_pos(options.pos || this.pos);    
     this.rotate(this.angle);
   }
   public get pos() {
     return this.vertices.centroid || new Point(0, 0);
+  }
+  public get speed() {
+    return this.velocity.magnitude();
   }
   momentum() {
     return this.velocity.product(this.mass);
@@ -61,13 +71,15 @@ export class Body {
   }
   rotate(angle:number) {
     this.vertices.rotate(angle, this.vertices.centroid);
+    this.angle = angle; 
   }
   update(tick:number) {
     const pos_x = this.velocity.x * tick + this.pos.x;
     const pos_y = this.velocity.y * tick + this.pos.y;
-    this.change_pos(new Point(pos_x, pos_y));
     this.velocity.x = this.acceleration.x * tick + this.velocity.x;
     this.velocity.y = this.acceleration.y * tick + this.velocity.y;
+    this.change_pos(new Point(pos_x, pos_y));
+    this.rotate(this.angular_speed + this.angle);
   }
 
   collide_with(body:Body) {
@@ -76,7 +88,17 @@ export class Body {
 
     const result1 = this.collide_with_axes(body, axes1);
     const result2 = this.collide_with_axes(body, axes2);
-    const result = result1.magnitude() > result2.magnitude() ? new Manifold([body, this], result2) : new Manifold([this, body], result1);
+    // TODO: use new contact method
+    let contact; 
+    if (result1.magnitude() < result2.magnitude()) {
+      contact = this.get_nearest_vertex(body).nearest_vertex;
+    } else {
+      contact = body.get_nearest_vertex(this).nearest_vertex;
+    }
+    const result = 
+      result1.magnitude() > result2.magnitude() ?
+      new Manifold([body, this], result2, contact as Point) :
+      new Manifold([this, body], result1, contact as Point);
     // if direction is contrast
     if (result.overlap.dot_product(result.pair[0].pos.minus(result.pair[1].pos)) < 0) {
       result.overlap.x = -result.overlap.x;
@@ -96,7 +118,7 @@ export class Body {
       const projection2 = this.project(axis);
       const current_depth = projection1.overlap_length(projection2);
       if (current_depth === 0) {
-        return result;
+        return new Vector(0, 0);
       }
       depth = Math.min(depth, current_depth);
       result = depth === current_depth ? axis.product(current_depth) : result;
@@ -104,19 +126,37 @@ export class Body {
     return result;
   }
 
+  get_nearest_vertex(body:Body) {
+    let distance = Infinity;
+    let nearest_vertex;
+    for(const dot of body.vertices.dots) {
+      const current_distance = new Vector(this.pos.x - dot.x, this.pos.y - dot.y).magnitude();
+      distance = Math.min(distance, current_distance);
+      nearest_vertex = distance === current_distance ? dot : nearest_vertex;
+    }
+    return {
+      distance,
+      nearest_vertex,
+    }
+  }
+
   project(axis:Vector) {
     let min = Infinity;
     let max = -Infinity;
+    let min_dot = empty[0];
+    let max_dot = empty[1];
     for(const dot of this.vertices.dots) {
       const project_value = dot.minus(origin_point).dot_product(axis);
       if (project_value > max) {
         max = project_value;
+        max_dot = dot;
       }
       if (project_value < min) {
         min = project_value;
+        min_dot = dot;
       }
     }
-    return new Projection(min, max, axis);
+    return new Projection(min, max, axis, min_dot, max_dot);
   }
 
   get_axes() {

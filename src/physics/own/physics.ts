@@ -1,5 +1,4 @@
 import { Body, Manifold } from "./body";
-import { Vector } from "./utils";
 export class World {
   public bodys: Body[] = [];
   public is_pause = false;
@@ -40,10 +39,11 @@ export class World {
       const body1 = pair[0];
       const body2 = pair[1];
 
+      // resolve velocity
       const restitution = Math.min(body1.restitution, body2.restitution);
       const velocity_relative = body1.velocity.minus(body2.velocity);
       const normal = overlap.normalize();
-
+      position_correction(manifold);
       const vel_along_normal = velocity_relative.dot_product(normal);
       if (vel_along_normal > 0) {
         return;
@@ -53,7 +53,9 @@ export class World {
       const impulse = normal.product(j);
       body1.velocity = body1.velocity.add(impulse.product(body1.inv_mass()));
       body2.velocity = body2.velocity.minus(impulse.product( body2.inv_mass()));
-      position_correction(manifold);
+
+      // resolve angular velocity
+
     }
   };
   get_bodys() {
@@ -65,6 +67,13 @@ export class World {
   update(tick: number) {
     if (!this.is_pause) {
       const pairs = this.get_collision_pairs();
+      // if (pairs.find((manifold) => manifold.pair[0].name === 'body1' || manifold.pair[0].name === 'body2' || manifold.pair[1].name === 'body1' || manifold.pair[1].name === 'body2')) {
+      //   console.log(pairs);
+      //   if (pairs.length >= 2) {
+      //     console.log(pairs);
+      //     this.puase();
+      //   } 
+      // }
       const bodys = this.bodys;
       bodys.forEach(this.update_body.bind(this, tick));
       this.resolve_collision(pairs);
