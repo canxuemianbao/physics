@@ -2,6 +2,7 @@ import { Vector, Point, origin_point, Projection} from './utils';
 import { Vertices, empty } from './vertices';
 
 export interface Config {
+  friction?:number;
   acceleration?:Vector;
   velocity?:Vector;
   mass?:number;
@@ -18,7 +19,7 @@ export class Manifold {
   constructor(
     public pair:[Body, Body],
     public overlap:Vector,
-    public contact_point:Point,
+    public contacts:Point[],
   ) {}
 
   is_separated() {
@@ -34,6 +35,7 @@ export class Body {
   public angle = 0;
   public angular_speed = 0;
   public restitution = 0;
+  public friction = 0;
   public vertices = new Vertices([]);
   public name = '';
   constructor(dots:Point[], options:Config) {
@@ -46,6 +48,7 @@ export class Body {
     this.mass = options.mass || this.density * this.vertices.area;
     this.angle = options.angle || 0;
     this.name = options.name || this.name;
+    this.friction = options.friction || this.friction;
     this.change_pos(options.pos || this.pos);    
     this.rotate(this.angle);
   }
@@ -71,7 +74,7 @@ export class Body {
   }
   rotate(angle:number) {
     this.vertices.rotate(angle, this.vertices.centroid);
-    this.angle = angle; 
+    this.angle = this.angle + angle; 
   }
   update(tick:number) {
     const pos_x = this.velocity.x * tick + this.pos.x;
@@ -79,26 +82,42 @@ export class Body {
     this.velocity.x = this.acceleration.x * tick + this.velocity.x;
     this.velocity.y = this.acceleration.y * tick + this.velocity.y;
     this.change_pos(new Point(pos_x, pos_y));
-    this.rotate(this.angular_speed + this.angle);
+    if (this.angular_speed) {
+      this.rotate(this.angular_speed);
+    }
   }
 
   collide_with(body:Body) {
-    const axes1 = this.get_axes();
-    const axes2 = body.get_axes();
+    let axes1 = this.get_axes();
+    let axes2 = body.get_axes();
+
+    const relative_direction1 = body.pos.minus(this.pos);
+    const relative_direction2 = this.pos.minus(body.pos);
+
+    // remove confuse axis
+    axes1 = axes1.filter((axis) => axis.dot_product(relative_direction1) >= 0);
+    axes2 = axes2.filter((axis) => axis.dot_product(relative_direction2) >= 0);
 
     const result1 = this.collide_with_axes(body, axes1);
     const result2 = this.collide_with_axes(body, axes2);
-    // TODO: use new contact method
-    let contact; 
-    if (result1.magnitude() < result2.magnitude()) {
-      contact = this.get_nearest_vertex(body).nearest_vertex;
+
+    // return because doesn't trigger collision
+    if (result1.magnitude() === 0 || result2.magnitude() === 0) {
+      return new Manifold([body, this], result2, []); 
+    }
+
+    let contacts = []; 
+    if (result1.magnitude() > result2.magnitude()) {
+      // this collide body
+      contacts = this.get_nearest_vertexes(result2.normalize());
     } else {
-      contact = body.get_nearest_vertex(this).nearest_vertex;
+      // body collide this
+      contacts = body.get_nearest_vertexes(result1.normalize());
     }
     const result = 
       result1.magnitude() > result2.magnitude() ?
-      new Manifold([body, this], result2, contact as Point) :
-      new Manifold([this, body], result1, contact as Point);
+      new Manifold([body, this], result2, contacts) :
+      new Manifold([this, body], result1, contacts);
     // if direction is contrast
     if (result.overlap.dot_product(result.pair[0].pos.minus(result.pair[1].pos)) < 0) {
       result.overlap.x = -result.overlap.x;
@@ -126,18 +145,38 @@ export class Body {
     return result;
   }
 
-  get_nearest_vertex(body:Body) {
-    let distance = Infinity;
-    let nearest_vertex;
-    for(const dot of body.vertices.dots) {
-      const current_distance = new Vector(this.pos.x - dot.x, this.pos.y - dot.y).magnitude();
-      distance = Math.min(distance, current_distance);
-      nearest_vertex = distance === current_distance ? dot : nearest_vertex;
+  get_nearest_vertexes(normal:Vector) {
+    let distance = -Infinity;
+    let nearest_vertexes:Point[] = [];
+    let nearest_vertexes_index = -1;
+    for (let i = 0; i < this.vertices.dots.length; i++) {
+      const dot = this.vertices.dots[i];
+      const vector = new Vector(dot.x - this.pos.x, dot.y - this.pos.y);
+      const temp_distance = -vector.dot_product(normal);
+      if (temp_distance > distance) {
+        distance = temp_distance;
+        nearest_vertexes = [dot];
+        nearest_vertexes_index = i;
+      }
     }
-    return {
-      distance,
-      nearest_vertex,
+    if (distance !== -Infinity) {
+      const possible_nearest_vertexes1 = this.vertices.dots[(nearest_vertexes_index + 1) % (this.vertices.dots.length)];
+      let vector = new Vector(possible_nearest_vertexes1.x - this.pos.x, possible_nearest_vertexes1.y - this.pos.y);
+      let temp_distance = -vector.dot_product(normal);
+      if (Math.abs(temp_distance - distance) < 0.001) {
+        nearest_vertexes.push(possible_nearest_vertexes1);
+        return nearest_vertexes;
+      }
+
+      const possible_nearest_vertexes2 = this.vertices.dots[(nearest_vertexes_index - 1 + this.vertices.dots.length) % (this.vertices.dots.length)];
+      vector = new Vector(possible_nearest_vertexes2.x - this.pos.x, possible_nearest_vertexes2.y - this.pos.y);
+      temp_distance = -vector.dot_product(normal);
+      if (Math.abs(temp_distance - distance) < 0.001) {
+        nearest_vertexes.push(possible_nearest_vertexes2);
+        return nearest_vertexes;
+      }      
     }
+    return nearest_vertexes;
   }
 
   project(axis:Vector) {
@@ -159,7 +198,8 @@ export class Body {
     return new Projection(min, max, axis, min_dot, max_dot);
   }
 
-  get_axes() {
+  // direction must be outside the edge
+  get_axes() {  
     const dots = this.vertices.dots;
     const normals = [];
     for (let i = 1; i< dots.length; i++) {

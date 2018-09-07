@@ -114,3 +114,7 @@ export class Point {
 }
 
 export const origin_point = new Point(0, 0);
+
+export const radian_to_angle = (radian:number) => 180 * radian / Math.PI;
+
+export const angle_to_radian = (angle:number) => angle * Math.PI / 180;

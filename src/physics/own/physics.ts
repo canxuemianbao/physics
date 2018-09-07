@@ -1,4 +1,7 @@
 import { Body, Manifold } from "./body";
+import * as _ from 'lodash';
+import { Vector, Point, radian_to_angle, angle_to_radian } from "./utils";
+import { cancel } from './index';
 export class World {
   public bodys: Body[] = [];
   public is_pause = false;
@@ -14,6 +17,12 @@ export class World {
         const manifold = body1.collide_with(body2);
         if (!manifold.is_separated()) {
           collisions_info.push(manifold);
+        } else {
+          // for test
+          {
+            delete body1.vertices.contacts;
+            delete body2.vertices.contacts;
+          }
         }
       }
     }
@@ -34,28 +43,70 @@ export class World {
       body1.change_pos(new_pos1);
       body2.change_pos(new_pos2);
     }
+
+    const get_impuse_weight = (
+      body1:Body,
+      body2:Body,
+      contact:Point,
+    ) => (direction:Vector) => {
+      const restitution = Math.min(body1.restitution, body2.restitution);
+      const body1_rotation_vector = contact.minus(body1.pos);
+      const body2_rotation_vector = contact.minus(body2.pos); 
+      const relative_velocity = body1.velocity.minus(body2.velocity);
+      
+      const numerator = -(1 + restitution) * (relative_velocity.dot_product(direction));
+      const denominator = 
+        body1.inv_mass() +
+        body2.inv_mass() +
+        Math.pow(body1_rotation_vector.dot_product(direction), 2) / body1.vertices.inertia +
+        Math.pow(body2_rotation_vector.dot_product(direction), 2) / body2.vertices.inertia;
+      return numerator / denominator;
+    };
     for (const manifold of manifolds) {
-      const {pair, overlap} = manifold;
+      const {pair, overlap, contacts} = manifold;
+      this.puase();
+      position_correction(manifold);
       const body1 = pair[0];
       const body2 = pair[1];
-
-      // resolve velocity
-      const restitution = Math.min(body1.restitution, body2.restitution);
-      const velocity_relative = body1.velocity.minus(body2.velocity);
       const normal = overlap.normalize();
-      position_correction(manifold);
-      const vel_along_normal = velocity_relative.dot_product(normal);
-      if (vel_along_normal > 0) {
-        return;
+      const tangent = overlap.normal();
+
+      let normal_impulse = new Vector(0, 0);
+      let tangent_impulse = new Vector(0, 0);
+      let body1_angle_speed = body1.angular_speed;
+      let body2_angle_speed = body2.angular_speed;
+      const friction = Math.min(body1.friction, body2.friction);
+      for (const contact of contacts) {
+        // for test 
+        {
+          body1.vertices.contacts = _.assign([], contacts);
+          body2.vertices.contacts = _.assign([], contacts);
+          body1.vertices.normal = overlap;
+        }
+        const body1_rotation_vector = contact.minus(body1.pos);
+        const body2_rotation_vector = contact.minus(body2.pos);
+        const normal_impulse_weigth = get_impuse_weight(body1, body2, contact)(normal);
+        normal_impulse = normal.product(normal_impulse_weigth);
+        const tangent_impulse_weigth = get_impuse_weight(body1, body2, contact)(tangent) * friction;
+        tangent_impulse = tangent_impulse.add(tangent.product(tangent_impulse_weigth));
+        body1_angle_speed = body1_angle_speed + (body1_rotation_vector.cross(normal_impulse)) / body1.vertices.inertia;
+        body2_angle_speed = body2_angle_speed - (body2_rotation_vector.cross(normal_impulse)) / body2.vertices.inertia;
       }
-      let j = -(1 + restitution) * vel_along_normal;
-      j /= body1.inv_mass() + body2.inv_mass();
-      const impulse = normal.product(j);
-      body1.velocity = body1.velocity.add(impulse.product(body1.inv_mass()));
-      body2.velocity = body2.velocity.minus(impulse.product( body2.inv_mass()));
-
-      // resolve angular velocity
-
+      body1.angular_speed = body1_angle_speed;
+      body2.angular_speed = body2_angle_speed;
+      const velocity_relative = body1.velocity.minus(body2.velocity);
+      position_correction(manifold);
+      if (velocity_relative.dot_product(normal) > 0) {
+        break;
+      }
+      // console.log('======tangent======');
+      // console.log('tangent_impulse', tangent_impulse);
+      // console.log('tangent velocity', tangent_impulse.product(body2.inv_mass()));
+      body1.velocity = body1.velocity.add(normal_impulse.product(body1.inv_mass()));
+      body2.velocity = body2.velocity.minus(normal_impulse.product(body2.inv_mass()));  
+      // body1.velocity = body1.velocity.add(tangent_impulse.product(body1.inv_mass()));
+      // const tangent_speed = tangent_impulse.product(body2.inv_mass());
+      body2.velocity = body2.velocity.minus(tangent_impulse.product(body2.inv_mass())); 
     }
   };
   get_bodys() {
@@ -66,16 +117,9 @@ export class World {
   };
   update(tick: number) {
     if (!this.is_pause) {
-      const pairs = this.get_collision_pairs();
-      // if (pairs.find((manifold) => manifold.pair[0].name === 'body1' || manifold.pair[0].name === 'body2' || manifold.pair[1].name === 'body1' || manifold.pair[1].name === 'body2')) {
-      //   console.log(pairs);
-      //   if (pairs.length >= 2) {
-      //     console.log(pairs);
-      //     this.puase();
-      //   } 
-      // }
       const bodys = this.bodys;
       bodys.forEach(this.update_body.bind(this, tick));
+      let pairs = this.get_collision_pairs();
       this.resolve_collision(pairs);
     }
   }

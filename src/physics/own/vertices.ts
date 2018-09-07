@@ -1,4 +1,4 @@
-import { Point } from './utils';
+import { Point, Vector } from './utils';
 import * as _ from 'lodash';
 
 export const empty = [new Point(0, 0), new Point(0, 0)];
@@ -6,6 +6,10 @@ export class Vertices {
   public area:number;
   public centroid:Point;
   public inertia:number;
+
+  // for test 
+  public contacts:Point[];
+  public normal:Vector;
 
   constructor(
     public dots:Point[] = empty,
@@ -56,6 +60,22 @@ export class Vertices {
     return new Point((a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3);
   }
 
+  // inertia2() {
+  //   let numerator = 0;
+  //   let denominator = 0;
+  //   const mass = this.area * this.density;
+  //   // find the polygon's moment of inertia, using second moment of area
+  //   // from equations at http://www.physicsforums.com/showthread.php?t=25293
+  //   for (var n = 0; n < this.dots.length; n++) {
+  //       const j = (n + 1) % this.dots.length;
+  //       const cross = Math.abs(Vector.cross(v[j], v[n]));
+  //       numerator += cross * (Vector.dot(v[j], v[j]) + Vector.dot(v[j], v[n]) + Vector.dot(v[n], v[n]));
+  //       denominator += cross;
+  //   }
+
+  //   return (mass / 6) * (numerator / denominator);
+  // };
+
   // http://lab.polygonal.de/2006/08/17/calculating-the-moment-of-inertia-of-a-convex-polygon/
   triangle_inertia(a_point:Point, b_point:Point, c_point:Point) {
     const A_B = a_point.minus(b_point);
@@ -63,7 +83,7 @@ export class Vertices {
     const a = A_C.dot_product(A_B.normalize());
     const h = A_C.cross(A_B.normalize());
     const b = A_B.magnitude();
-    return (b * b * b * h - b * b * h * a + b * h * a * a + b * h * h * h) / 36;
+    return 5000 * (b * b * b * h - b * b * h * a + b * h * a * a + b * h * h * h) / 36;
   }
 
   init() {
