@@ -1,10 +1,22 @@
 import { Body, Manifold } from "./body";
 import * as _ from 'lodash';
 import { Vector, Point, radian_to_angle, angle_to_radian } from "./utils";
+import { swept } from './ccd';
 import { cancel } from './index';
+
+interface WorldConfig {
+  friction_air?:number;
+  gravity?:Vector;
+}
 export class World {
   public bodys: Body[] = [];
   public is_pause = false;
+  public friction_air = 0;
+  public gravity = new Vector(0, 0);
+  constructor(options:WorldConfig) {
+    this.friction_air = options.friction_air || this.friction_air;
+    this.gravity = options.gravity || this.gravity;
+  }
   add_body(body: Body) {
     this.bodys.push(body);
   }
@@ -64,13 +76,11 @@ export class World {
     };
     for (const manifold of manifolds) {
       const {pair, overlap, contacts} = manifold;
-      this.puase();
       position_correction(manifold);
       const body1 = pair[0];
       const body2 = pair[1];
       const normal = overlap.normalize();
       const tangent = overlap.normal();
-
       let normal_impulse = new Vector(0, 0);
       let tangent_impulse = new Vector(0, 0);
       let body1_angle_speed = body1.angular_speed;
@@ -90,15 +100,16 @@ export class World {
         const tangent_impulse_weigth = get_impuse_weight(body1, body2, contact)(tangent) * friction;
         tangent_impulse = tangent_impulse.add(tangent.product(tangent_impulse_weigth));
         body1_angle_speed = body1_angle_speed + (body1_rotation_vector.cross(normal_impulse)) / body1.vertices.inertia;
+        body1.angular_speed = body1_angle_speed + (body1_rotation_vector.cross(tangent_impulse)) / body1.vertices.inertia;
         body2_angle_speed = body2_angle_speed - (body2_rotation_vector.cross(normal_impulse)) / body2.vertices.inertia;
+        body2.angular_speed = body2_angle_speed - (body2_rotation_vector.cross(tangent_impulse)) / body2.vertices.inertia;
       }
-      body1.angular_speed = body1_angle_speed;
-      body2.angular_speed = body2_angle_speed;
       const velocity_relative = body1.velocity.minus(body2.velocity);
       position_correction(manifold);
       if (velocity_relative.dot_product(normal) > 0) {
         break;
       }
+      tangent_impulse = tangent_impulse.product(0.05);
       // console.log('======tangent======');
       // console.log('tangent_impulse', tangent_impulse);
       // console.log('tangent velocity', tangent_impulse.product(body2.inv_mass()));
@@ -118,6 +129,9 @@ export class World {
   update(tick: number) {
     if (!this.is_pause) {
       const bodys = this.bodys;
+      // console.log('tick', tick);
+      swept(bodys[0], bodys[1]);
+      // this.puase();
       bodys.forEach(this.update_body.bind(this, tick));
       let pairs = this.get_collision_pairs();
       this.resolve_collision(pairs);

@@ -1,4 +1,5 @@
 import { Vector, Point, origin_point, Projection} from './utils';
+import { swept } from './ccd';
 import { Vertices, empty } from './vertices';
 
 export interface Config {
@@ -58,8 +59,14 @@ export class Body {
   public get speed() {
     return this.velocity.magnitude();
   }
-  momentum() {
+  public get momentum() {
     return this.velocity.product(this.mass);
+  }
+  public get energy() {
+    return this.velocity.dot_product(this.velocity) * this.mass;
+  }
+  public get angularMomentum() {
+    return this.vertices.inertia * this.angular_speed;
   }
   inv_mass() {
     if (this.mass === 0) {
@@ -103,7 +110,7 @@ export class Body {
 
     // return because doesn't trigger collision
     if (result1.magnitude() === 0 || result2.magnitude() === 0) {
-      return new Manifold([body, this], result2, []); 
+      return new Manifold([body, this], new Vector(0, 0), []); 
     }
 
     let contacts = []; 
@@ -143,6 +150,20 @@ export class Body {
       result = depth === current_depth ? axis.product(current_depth) : result;
     }
     return result;
+  }
+
+  swept(body:Body) {
+    const distance_bewteen = this.pos.minus(body.pos);
+    const distance_scalar = distance_bewteen.magnitude();
+    const speed_bewteen = body.velocity.minus(this.velocity);
+    const speed_scalar = speed_bewteen.dot_product(distance_bewteen.normalize());
+    if (speed_scalar * distance_scalar < 0) {
+      return;
+    }
+    const time = distance_scalar / speed_scalar;
+    console.log('distance_scalar', distance_scalar);
+    console.log('speed_bewteen', distance_bewteen.normalize());
+    console.log('time', time);
   }
 
   get_nearest_vertexes(normal:Vector) {

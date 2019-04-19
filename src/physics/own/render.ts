@@ -113,10 +113,6 @@ export function create(world:World, options:any) {
 
 function draw_body(body:Body) {
   ctx.save();
-  // prepare
-  // ctx.translate(body.pos.x, body.pos.y);
-  // ctx.rotate(body.angle);
-  // ctx.translate(-body.pos.x, -body.pos.y);
   ctx.strokeStyle = '#FFFFFF';  
   // draw
   const dots = body.vertices.dots;
@@ -150,6 +146,20 @@ function draw_body(body:Body) {
   ctx.restore();
 }
 
+function draw_information(bodys:Body[]) {
+  ctx.save();
+  ctx.fillStyle = 'white';
+  ctx.fillRect(canvas.width - 300, 20, 350, 80);
+  const font_size = 18;
+  ctx.fillStyle = 'black';
+  ctx.font = `${font_size}px serif`;
+  const energy = bodys.filter((body) => body.mass !== Infinity).reduce((pre_energy, body) => pre_energy + body.energy, 0);
+  ctx.fillText(`能量：${energy}`, canvas.width - 250, 30 + font_size / 2);
+  const angularMomentum = bodys.filter((body) => body.mass !== Infinity).reduce((angularMomentum, body) => angularMomentum + body.angularMomentum, 0);
+  ctx.fillText(`角动量：${angularMomentum}`, canvas.width - 250, 30 + font_size / 2 + font_size / 2 + 10);  
+  ctx.restore();
+}
+
 export function clear() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillRect(0, 0, canvas.width, canvas.height);  
@@ -165,7 +175,8 @@ class Render {
 
   tick() {
     clear();
-    this.world.get_bodys().forEach(draw_body);  
+    this.world.get_bodys().forEach(draw_body);
+    draw_information(this.world.get_bodys());
   }
 
   update = (now:number) =>{

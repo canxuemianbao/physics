@@ -7,7 +7,7 @@ import {
 } from './physics';
 import { Point, Vector } from './utils';
 
-const world = new World();
+const world = new World({gravity:new Vector(0, 100)});
 
 const points = [new Point(0, -100), new Point(1000, -100), new Point(1000, 10), new Point(0, 10)].reverse();
 
@@ -35,13 +35,13 @@ export const demo = () => {
     // angular_speed: 1 / 180 * Math.PI,
     // acceleration: {y:50, x:0},
     // acceleration: new Vector(0, 0),
-    velocity: new Vector(-200, 0),
-    friction: 0,
-    density: 2,
-    restitution: 0.5,
+    velocity: new Vector(0, 150),
+    // friction: 0.01,
+    // density: 2,
+    restitution: 1,
     name:'body1',
   });
-  body1.change_pos(new Point(500, 500));
+  body1.change_pos(new Point(500, 550));
   const body2 = new Body([
     new Point(0, 0),
     // new Point(100, 0),
@@ -55,6 +55,7 @@ export const demo = () => {
     angle: 30 * Math.PI / 180,
     density: 1,
     restitution: 1,
+    friction: 1,
     pos: new Point(500, 400),
     name:'body2',
   });
@@ -70,12 +71,13 @@ export const demo = () => {
     velocity: new Vector(100, -100),
     density: 1,
     restitution: 1,
+    friction: 1,
     name:'body3',
     pos: new Point(200, 300),
   });
-  world.add_body(wall1);
-  world.add_body(wall2);
-  world.add_body(wall3);
+  // world.add_body(wall1);
+  // world.add_body(wall2);
+  // world.add_body(wall3);
   world.add_body(wall4);
 
   world.add_body(body1);
