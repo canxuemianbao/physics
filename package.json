@@ -3,13 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@types/lodash": "^4.14.109",
+    "@types/lodash": "*",
     "@types/matter-js": "^0.10.0",
     "@types/p2": "^0.7.31",
     "@types/pixi.js": "^4.7.2",
-    "lodash": "^4.17.10",
+    "lodash": "*",
     "matter-js": "^0.14.1",
-    "msqr": "^0.2.1",
     "p2": "^0.7.1",
     "pixi.js": "^4.7.3",
     "react": "^16.3.1",
@@ -17,7 +16,7 @@
     "react-scripts-ts": "2.15.1"
   },
   "scripts": {
-    "start": "react-scripts-ts start",
+    "start": "parcel ./public/index.html",
     "build": "react-scripts-ts build",
     "test": "react-scripts-ts test --env=jsdom",
     "eject": "react-scripts-ts eject"
@@ -28,6 +27,7 @@
     "@types/react": "^16.3.10",
     "@types/react-dom": "^16.0.5",
     "mocha": "^5.2.0",
+    "process": "^0.11.10",
     "typescript": "^2.8.1"
   }
 }
